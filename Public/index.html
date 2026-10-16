@@ -1,0 +1,178 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090d18">
+  <title>XtremeVerse AI</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      background: #090d18; color: #f4f6ff;
+      font-family: system-ui, sans-serif;
+      display: flex; flex-direction: column;
+    }
+    header {
+      padding: 18px; border-bottom: 1px solid #242c40;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .logo {
+      background: linear-gradient(135deg,#8b5cf6,#06b6d4);
+      padding: 10px; border-radius: 12px; font-weight: 900;
+    }
+    header h1 { font-size: 19px; margin: 0; }
+    header p { margin: 3px 0 0; color: #a4adc4; font-size: 12px; }
+    main {
+      width: min(760px,100%); margin: auto;
+      padding: 20px; display: flex; flex-direction: column;
+      flex: 1; gap: 16px;
+    }
+    .welcome { text-align: center; padding: 24px 4px; }
+    .welcome h2 { font-size: clamp(27px,6vw,40px); margin: 0 0 10px; }
+    .glow {
+      background: linear-gradient(90deg,#a78bfa,#22d3ee);
+      color: transparent; background-clip: text;
+    }
+    .welcome p { color: #a4adc4; line-height: 1.6; }
+    #chat {
+      display: flex; flex-direction: column; gap: 14px;
+      flex: 1; padding-bottom: 14px;
+    }
+    .message {
+      white-space: pre-wrap; overflow-wrap: anywhere;
+      line-height: 1.6; padding: 13px 16px;
+      border-radius: 16px; max-width: 92%;
+    }
+    .user {
+      align-self: flex-end; background: #26365b;
+      border: 1px solid #394c76;
+    }
+    .assistant {
+      align-self: flex-start; background: #131b2c;
+      border: 1px solid #263149;
+    }
+    .label {
+      display: block; color: #a78bfa; font-size: 11px;
+      font-weight: 800; margin-bottom: 5px;
+    }
+    form {
+      position: sticky; bottom: 0; background: #090d18;
+      padding: 10px 0 16px;
+    }
+    .composer {
+      display: flex; gap: 9px; padding: 8px;
+      border: 1px solid #303951; border-radius: 18px;
+      background: #111827;
+    }
+    textarea {
+      flex: 1; min-width: 0; resize: none;
+      border: 0; outline: 0; background: transparent;
+      color: white; font: inherit; padding: 10px;
+      max-height: 140px;
+    }
+    button {
+      border: 0; border-radius: 12px; padding: 12px 17px;
+      background: linear-gradient(135deg,#8b5cf6,#0891b2);
+      color: white; font-weight: 800;
+    }
+    button:disabled { opacity: .5; }
+    #status { text-align: center; color: #9ca8c2; font-size: 12px; }
+    footer { text-align: center; color: #65708a; font-size: 12px; padding: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">XV</div>
+    <div>
+      <h1>XtremeVerse AI</h1>
+      <p>Your ideas. Your universe.</p>
+    </div>
+  </header>
+
+  <main>
+    <section class="welcome" id="welcome">
+      <h2>Welcome to <span class="glow">XtremeVerse</span></h2>
+      <p>Ask anything, explore ideas, or chat in your own language.</p>
+    </section>
+
+    <section id="chat" aria-live="polite"></section>
+    <div id="status">Ready to chat</div>
+
+    <form id="form">
+      <div class="composer">
+        <textarea id="prompt" rows="1" maxlength="4000"
+          placeholder="Message XtremeVerse AI..." required></textarea>
+        <button id="send" type="submit">Send</button>
+      </div>
+    </form>
+  </main>
+
+  <footer>Independent project · XtremeVerse AI</footer>
+
+  <script>
+    const form = document.getElementById("form");
+    const promptBox = document.getElementById("prompt");
+    const chat = document.getElementById("chat");
+    const send = document.getElementById("send");
+    const statusBox = document.getElementById("status");
+    const welcome = document.getElementById("welcome");
+    const history = [];
+
+    function addMessage(role, text) {
+      const bubble = document.createElement("div");
+      bubble.className = "message " + role;
+      const label = document.createElement("span");
+      label.className = "label";
+      label.textContent = role === "user" ? "YOU" : "XTREMEVERSE AI";
+      const content = document.createElement("div");
+      content.textContent = text;
+      bubble.append(label, content);
+      chat.appendChild(bubble);
+      bubble.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      const text = promptBox.value.trim();
+      if (!text || send.disabled) return;
+
+      welcome.hidden = true;
+      addMessage("user", text);
+      history.push({ role: "user", content: text });
+      promptBox.value = "";
+      send.disabled = true;
+      statusBox.textContent = "XtremeVerse AI is thinking...";
+
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: history.slice(-16) })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "AI request failed.");
+
+        const reply = data.reply || "I couldn't generate a response.";
+        addMessage("assistant", reply);
+        history.push({ role: "assistant", content: reply });
+        statusBox.textContent = "Ready to chat";
+      } catch (error) {
+        addMessage("assistant", "Sorry bro, I couldn't connect: " + error.message);
+        history.pop();
+        statusBox.textContent = "Connection error";
+      } finally {
+        send.disabled = false;
+        promptBox.focus();
+      }
+    });
+
+    promptBox.addEventListener("input", () => {
+      promptBox.style.height = "auto";
+      promptBox.style.height = Math.min(promptBox.scrollHeight, 140) + "px";
+    });
+  </script>
+</body>
+</html>
