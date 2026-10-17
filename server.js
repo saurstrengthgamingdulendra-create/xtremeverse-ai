@@ -16,16 +16,17 @@ app.get("/api/health", (req, res) => {
 
 app.post("/api/chat", async (req, res) => {
   try {
-    const messages = req.body.messages;
+    const messages = Array.isArray(req.body.messages)
+      ? req.body.messages
+      : [];
 
-    const conversation = Array.isArray(messages)
-      ? messages
-          .filter(m => m && typeof m.content === "string")
-          .map(m => `${m.role === "assistant" ? "Assistant" : "User"}: ${m.content}`)
-          .join("\n\n")
-      : typeof req.body.message === "string"
-        ? req.body.message
-        : "";
+    const conversation = messages
+      .filter(m => m && typeof m.content === "string")
+      .map(m =>
+        `${m.role === "assistant" ? "Assistant" : "User"}: ${m.content}`
+      )
+      .join("\n\n") ||
+      (typeof req.body.message === "string" ? req.body.message : "");
 
     if (!conversation.trim()) {
       return res.status(400).json({
@@ -37,12 +38,12 @@ app.post("/api/chat", async (req, res) => {
 
     if (!apiKey) {
       return res.status(500).json({
-        error: "AI setup is incomplete. Please try again later."
+        error: "AI setup is incomplete."
       });
     }
 
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
       {
         method: "POST",
         headers: {
@@ -52,14 +53,12 @@ app.post("/api/chat", async (req, res) => {
         body: JSON.stringify({
           systemInstruction: {
             parts: [{
-              text: "You are XtremeVerse AI, a friendly, helpful assistant. Respond naturally and clearly."
+              text: "You are XtremeVerse AI, a friendly and helpful assistant. Reply naturally and clearly."
             }]
           },
           contents: [{
             role: "user",
-            parts: [{
-              text: conversation
-            }]
+            parts: [{ text: conversation }]
           }]
         })
       }
@@ -70,7 +69,7 @@ app.post("/api/chat", async (req, res) => {
     if (!response.ok) {
       console.error("Gemini API error:", data);
       return res.status(502).json({
-        error: data.error?.message || "The AI couldn't respond. Please try again."
+        error: data.error?.message || "The AI couldn't respond."
       });
     }
 
@@ -81,7 +80,7 @@ app.post("/api/chat", async (req, res) => {
 
     if (!reply) {
       return res.status(502).json({
-        error: "The AI returned an empty response. Please try again."
+        error: "The AI returned an empty response."
       });
     }
 
@@ -95,7 +94,6 @@ app.post("/api/chat", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
   console.log(`XtremeVerse AI running on port ${PORT}`);
 });
