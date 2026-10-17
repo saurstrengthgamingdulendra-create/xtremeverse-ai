@@ -2,6 +2,7 @@ const express = require("express");
 const path = require("path");
 
 const app = express();
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -15,10 +16,21 @@ app.get("/api/health", (req, res) => {
 
 app.post("/api/chat", async (req, res) => {
   try {
-    const message = req.body.message;
+    const messages = req.body.messages;
 
-    if (!message) {
-      return res.status(400).json({ error: "Please enter a message." });
+    const conversation = Array.isArray(messages)
+      ? messages
+          .filter(m => m && typeof m.content === "string")
+          .map(m => `${m.role === "assistant" ? "Assistant" : "User"}: ${m.content}`)
+          .join("\n\n")
+      : typeof req.body.message === "string"
+        ? req.body.message
+        : "";
+
+    if (!conversation.trim()) {
+      return res.status(400).json({
+        error: "Please enter a message."
+      });
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
@@ -38,7 +50,17 @@ app.post("/api/chat", async (req, res) => {
           "x-goog-api-key": apiKey
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: message }] }]
+          systemInstruction: {
+            parts: [{
+              text: "You are XtremeVerse AI, a friendly, helpful assistant. Respond naturally and clearly."
+            }]
+          },
+          contents: [{
+            role: "user",
+            parts: [{
+              text: conversation
+            }]
+          }]
         })
       }
     );
@@ -48,21 +70,32 @@ app.post("/api/chat", async (req, res) => {
     if (!response.ok) {
       console.error("Gemini API error:", data);
       return res.status(502).json({
-        error: "The AI couldn't respond. Please try again."
+        error: data.error?.message || "The AI couldn't respond. Please try again."
       });
     }
 
-    const reply =
-      data.candidates?.[0]?.content?.parts
-        ?.map(part => part.text || "")
-        .join("") || "I couldn't generate a reply.";
+    const reply = data.candidates?.[0]?.content?.parts
+      ?.map(part => part.text || "")
+      .join("")
+      .trim();
+
+    if (!reply) {
+      return res.status(502).json({
+        error: "The AI returned an empty response. Please try again."
+      });
+    }
 
     res.json({ reply });
   } catch (error) {
     console.error("Chat error:", error);
-    res.status(500).json({ error: "Something went wrong." });
+    res.status(500).json({
+      error: "Something went wrong. Please try again."
+    });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`XtremeVerse AI running on port ${PORT}`));
+
+app.listen(PORT, () => {
+  console.log(`XtremeVerse AI running on port ${PORT}`);
+});
