@@ -8,6 +8,10 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", name: "XtremeVerse AI" });
 });
@@ -24,16 +28,9 @@ app.post("/api/chat", async (req, res) => {
 
     const messages = Array.isArray(req.body.messages)
       ? req.body.messages
-          .filter(m =>
-            m &&
-            ["user", "assistant"].includes(m.role) &&
-            typeof m.content === "string"
-          )
+          .filter(m => m && ["user", "assistant"].includes(m.role) && typeof m.content === "string")
           .slice(-16)
-          .map(m => ({
-            role: m.role,
-            content: m.content.slice(0, 4000)
-          }))
+          .map(m => ({ role: m.role, content: m.content.slice(0, 4000) }))
       : [];
 
     if (!messages.length || messages[messages.length - 1].role !== "user") {
@@ -48,8 +45,7 @@ app.post("/api/chat", async (req, res) => {
       },
       body: JSON.stringify({
         model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-        instructions:
-          "You are XtremeVerse AI, a helpful multilingual assistant. Understand slang, typos, informal messages, and incomplete sentences. Reply naturally in the user's language. Be honest when uncertain.",
+        instructions: "You are XtremeVerse AI, a helpful multilingual assistant. Understand slang, typos, informal messages, and incomplete sentences. Reply naturally in the user's language. Be honest when uncertain.",
         input: messages.map(m => ({
           role: m.role,
           content: [{ type: "input_text", text: m.content }]
@@ -72,9 +68,7 @@ app.post("/api/chat", async (req, res) => {
       .map(item => item.text)
       .join("\n");
 
-    res.json({
-      reply: answer || "I couldn't generate a reply. Please try again."
-    });
+    res.json({ reply: answer || "I couldn't generate a reply. Please try again." });
   } catch (error) {
     console.error("Chat error:", error.message);
     res.status(500).json({ error: "Something went wrong. Please try again." });
@@ -84,4 +78,3 @@ app.post("/api/chat", async (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`XtremeVerse AI running on port ${PORT}`);
 });
-      
